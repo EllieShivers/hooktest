@@ -1,0 +1,54 @@
+library testing version '1.0'
+using FHIR version '4.0.0'
+include FHIRHelpers version '4.0.0' called FHIRHelpers
+
+context Patient
+
+define "first_name": Patient.name[0].given[0]
+define "last_name": Patient.name[0].family
+define "full_name": "first_name" + ' ' + "last_name"
+define "date_of_birth": Patient.birthDate
+define "age": AgeInYears()
+define "gender": Patient.gender
+define "race": TurnCodingIntoString(Patient.valueOmbCategoryRace())
+define "ethnicity": TurnCodingIntoString(Patient.valueOmbCategoryEthnicity())
+define "hispanic_or_latino_choice":
+	case "ethnicity"
+		when 'urn:oid:2.16.840.1.113883.6.238^2186-5^Non Hispanic or Latino' then 'No'
+		when 'urn:oid:2.16.840.1.113883.6.238^2135-2^Hispanic or Latino' then 'Yes'
+		else 'Unknown'
+	end
+define "birthsex": Patient.valueUSCoreBirthSex()
+define "zip": Patient.address.postalCode[0]
+define "state": Patient.address.state[0]
+
+// Helper Functions from FHIRCommon
+define function Extensions(domainResource DomainResource, url String):
+  domainResource.extension E
+	  where E.url = url
+		return E
+define function Extensions(element Element, url String):
+  element.extension E
+	  where E.url = url
+		return E
+define function Extension(domainResource DomainResource, url String):
+  singleton from "Extensions"(domainResource, url)
+define function Extension(element Element, url String):
+  singleton from Extensions(element, url)
+
+define fluent function valueOmbCategoryRace(patient Patient):
+  Extension(Extension(patient, 'http://hl7.org/fhir/us/core/StructureDefinition/us-core-race'), 'ombCategory').value
+define fluent function valueOmbCategoryEthnicity(patient Patient):
+  Extension(Extension(patient, 'http://hl7.org/fhir/us/core/StructureDefinition/us-core-ethnicity'), 'ombCategory').value
+define fluent function valueUSCoreBirthSex(patient Patient):
+  Extension(patient, 'http://hl7.org/fhir/us/core/StructureDefinition/us-core-birthsex').value
+
+// Custom Helper Functions
+define function TurnCodingIntoString(c FHIR.Coding):
+    c C return
+			case
+				when (C.system) is null then 'nullSystem'
+				when (C.code) is null then 'nullCode'
+				when (C.display) is null then 'nullDisplay'
+				else C.system+'^'+C.code+'^'+C.display
+			end
